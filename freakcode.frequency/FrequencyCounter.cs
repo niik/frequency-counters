@@ -32,6 +32,15 @@ namespace freakcode.frequency
     /// </summary>
     public sealed class FrequencyCounter
     {
+        [DebuggerDisplay("Sample: {TimeValue}: {Samples}")]
+        private sealed class FrequencyNode
+        {
+            public int TimeValue;
+            public long Samples;
+
+            public FrequencyNode Next;
+        }
+
         /// <summary>
         /// Gets or sets the duration of the counter in seconds.
         /// The duration is the amount of time for which this counter
@@ -49,7 +58,7 @@ namespace freakcode.frequency
         /// <summary>
         /// Actual storage location of current counter value. 
         /// </summary>
-        private long _value;
+        private long value;
 
         /// <summary>
         /// Gets the total number of counted occurrences over the
@@ -60,23 +69,17 @@ namespace freakcode.frequency
         {
             get
             {
-                if (Interlocked.Read(ref _value) == 0)
+                if (Interlocked.Read(ref this.value) == 0)
                     return 0;
 
-                return VerifyHead(GetTimeValue());
+                Prune(GetTimeValue());
+
+                return Interlocked.Read(ref this.value);
             }
         }
 
-        /// <summary>
-        /// Gets the number of currently active data points within this counter
-        /// </summary>
-        /// <value>The number of internal nodes used to track and represent the value of the counter.</value>
-        public int DataPointCount { get; private set; }
-
         private FrequencyNode head;
         private FrequencyNode tail;
-
-        private readonly object listSyncObj = new object();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FrequencyCounter"/> class.
@@ -99,17 +102,17 @@ namespace freakcode.frequency
         /// Records one sample.
         /// </summary>
         /// <returns>The total sum of all samples in the counter after the sample has been added</returns>
-        public long Record()
+        public long Increment()
         {
-            return Record(1);
+            return this.Add(1);
         }
 
         /// <summary>
-        /// Records the specified sample count.
+        /// Add the specified sample count.
         /// </summary>
         /// <param name="sampleCount">The number of samples to record. Must not be negative. If sampleCount is zero no action will be performed.</param>
         /// <returns>The total sum of all samples in the counter after the samples has been added</returns>
-        public long Record(int sampleCount)
+        public long Add(int sampleCount)
         {
             if (sampleCount == 0)
                 return Value;
@@ -118,103 +121,61 @@ namespace freakcode.frequency
                 throw new ArgumentOutOfRangeException("count");
 
             int timeValue = GetTimeValue();
-            var tailNode = this.tail;
 
-            if (tailNode == null || tailNode.TimeValue != timeValue)
+            FrequencyNode currentHead;
+
+            do
             {
-                lock (listSyncObj)
+                currentHead = this.head;
+
+                if (currentHead == null || currentHead.TimeValue != timeValue)
                 {
-                    Debug.WriteLine("Add acquired lock; moving head");
+                    var newNode = new FrequencyNode { TimeValue = timeValue };
 
-                    tailNode = this.tail;
-
-                    if (tailNode == null || tailNode.TimeValue != timeValue)
+                    if (Interlocked.CompareExchange(ref this.head, newNode, currentHead) == currentHead)
                     {
-                        var newNode = new FrequencyNode(timeValue);
+                        if (currentHead != null)
+                            currentHead.Next = newNode;
 
-                        if (tailNode == null)
-                        {
-                            // This is the one and only item in the list
-                            this.head = newNode;
-                            this.tail = newNode;
-                        }
-                        else
-                        {
-                            this.tail = newNode;
-                            tailNode.Next = newNode;
-                        }
-
-                        tailNode = newNode;
-                        this.DataPointCount++;
+                        this.head = newNode;
+                        Interlocked.CompareExchange(ref this.tail, newNode, null);
                     }
                 }
-            }
+            } while (currentHead == null || currentHead.TimeValue != timeValue);
 
-            tailNode.AddSamples(sampleCount);
-            Interlocked.Add(ref _value, sampleCount);
+            Interlocked.Add(ref currentHead.Samples, sampleCount);
+            Interlocked.Add(ref this.value, sampleCount);
 
-            return VerifyHead(timeValue);
+            Prune(timeValue);
+            return Interlocked.Read(ref this.value);
         }
 
-        private long VerifyHead(int timeValue)
+        private void Prune(int timeValue)
         {
-            FrequencyNode node = this.head;
-
-            if (node == null)
-                return 0;
-
-            long sum = 0;
-            int removedNodes = 0;
-
             int expiry = timeValue - Duration;
+            long sampleCount = 0;
 
-            while (node != null && node.TimeValue < expiry)
+            FrequencyNode currentTail, node;
+
+            do
             {
-                sum += node.Samples;
-                removedNodes++;
+                currentTail = this.tail;
 
-                node = node.Next;
-            }
+                if (currentTail.TimeValue >= expiry)
+                    return;
 
-            if (node != head)
-            {
-                // Something has changed
+                node = currentTail;
 
-                lock (listSyncObj)
+                while (node != null && node.TimeValue < expiry)
                 {
-                    if (node == null)
-                    {
-                        // None of the nodes where in range. We've purged all nodes;
-                        Debug.WriteLine("VerifyHead acquired lock; no items left");
-
-                        //Debug.Assert(this._sampleCount == removedSamples);
-
-                        this.head = null;
-                        this.tail = null;
-
-                        Interlocked.Exchange(ref this._value, 0);
-
-                        return 0;
-                    }
-                    else
-                    {
-                        // We've purged one or more nodes
-
-                        Debug.WriteLine("VerifyHead acquired lock; moving head");
-
-                        //Debug.Assert(_sampleCount >= removedSamples);
-
-                        this.head = node;
-
-                        this.DataPointCount -= removedNodes;
-
-                        return Interlocked.Add(ref _value, -sum);
-                    }
+                    sampleCount += node.Samples;
+                    node = node.Next;
                 }
-            }
 
-            // Nothing has changed; return the total value
-            return Interlocked.Read(ref _value);
+                if (Interlocked.CompareExchange(ref this.tail, node, currentTail) == currentTail)
+                    Interlocked.Add(ref this.value, -sampleCount);
+
+            } while (currentTail != null && currentTail.TimeValue > expiry);
         }
 
         private int GetTimeValue()

@@ -59,7 +59,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FrequencyCounter.cs" />
-    <Compile Include="FrequencyNode.cs" />
     <Compile Include="Monotonic.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
