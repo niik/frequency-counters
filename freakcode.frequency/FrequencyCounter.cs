@@ -30,8 +30,12 @@ namespace freakcode.frequency
     /// Can be both read and written to concurrently. Accurately records occurrences independently of system
     /// clock changes such as DST or ntp-corrections.
     /// </summary>
+    [DebuggerDisplay("Counter {Duration}/{Precision}: {Value}")]
     public sealed class FrequencyCounter
     {
+        /// <summary>
+        /// A singly-linked list node representing a specific time value (slice)
+        /// </summary>
         [DebuggerDisplay("Sample: {TimeValue}: {Samples}")]
         private sealed class FrequencyNode
         {
@@ -69,6 +73,8 @@ namespace freakcode.frequency
         {
             get
             {
+                // Fast-path out; if we're at zero there's no
+                // nodes available for pruning
                 if (Interlocked.Read(ref this.value) == 0)
                     return 0;
 
@@ -78,7 +84,16 @@ namespace freakcode.frequency
             }
         }
 
+        /// <summary>
+        /// The head node of the singly linked list.
+        /// Contains the most current ("newest") node.
+        /// </summary>
         private FrequencyNode head;
+
+        /// <summary>
+        /// The tail node of the singly linked list.
+        /// Contains the oldest node.
+        /// </summary>
         private FrequencyNode tail;
 
         /// <summary>
@@ -130,14 +145,23 @@ namespace freakcode.frequency
 
                 if (currentHead == null || currentHead.TimeValue != timeValue)
                 {
+                    // The head node is out of date or we're empty so we need to
+                    // create a new node to take it's place
                     var newNode = new FrequencyNode { TimeValue = timeValue };
 
+                    // Try to update the head reference to our newly created node.
+                    // If we fail we'll just try again since most likely someone else
+                    // managed to update the node before us and we can use that instead.
                     if (Interlocked.CompareExchange(ref this.head, newNode, currentHead) == currentHead)
                     {
+                        // Succeeded in setting the head reference. If we wheren't empty
+                        // before we need to update the previous head node so that it references
+                        // the new head.
                         if (currentHead != null)
                             currentHead.Next = newNode;
 
-                        this.head = newNode;
+                        // If the tail node reference is null we'll update it to point to
+                        // our new head node.
                         Interlocked.CompareExchange(ref this.tail, newNode, null);
                     }
                 }
@@ -147,9 +171,13 @@ namespace freakcode.frequency
             Interlocked.Add(ref this.value, sampleCount);
 
             Prune(timeValue);
+
             return Interlocked.Read(ref this.value);
         }
 
+        /// <summary>
+        /// Removes all nodes which have expired from the linked list.
+        /// </summary>
         private void Prune(int timeValue)
         {
             int expiry = timeValue - Duration;
@@ -166,24 +194,38 @@ namespace freakcode.frequency
 
                 node = currentTail;
 
+                // Seek to the first node which haven't expired yet and sum
+                // all samples seen.
                 while (node != null && node.TimeValue < expiry)
                 {
                     sampleCount += node.Samples;
                     node = node.Next;
                 }
 
+                // Attempt to update the tail so that it points to the last
+                // valid node. Since the nodes only contain forward references
+                // there's no need to explicitly remove them, they will be garbage
+                // collected eventually
                 if (Interlocked.CompareExchange(ref this.tail, node, currentTail) == currentTail)
+                {
+                    // We won the update race; subtract the sum of all detached nodes
                     Interlocked.Add(ref this.value, -sampleCount);
+                }
 
             } while (currentTail != null && currentTail.TimeValue > expiry);
         }
 
+        /// <summary>
+        /// Gets a time value in seconds evenly divisible with the precision of the counter.
+        /// For a counter with a 5-second precision the first 15 seconds this will yield 
+        /// 3 time distinct time values; 0, 5 and 10.
+        /// </summary>
         private int GetTimeValue()
         {
             long monoTimeMilliseconds = Monotonic.Now;
-            long monoTimeSeconds = monoTimeMilliseconds / 1000;
+            int monoTimeSeconds = (int)(monoTimeMilliseconds / 1000);
 
-            return (int)(monoTimeSeconds - (monoTimeSeconds % Precision));
+            return monoTimeSeconds - (monoTimeSeconds % Precision);
         }
     }
 }

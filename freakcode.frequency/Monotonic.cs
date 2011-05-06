@@ -44,7 +44,7 @@ namespace freakcode.frequency
         /// <summary>
         /// Generation upgrade guarantee timer
         /// </summary>
-        [SuppressMessage("Microsoft.Performance", "CA1823:AvoidUnusedPrivateFields", Justification="The reference must be saved in order to prevent the timer from being garbage collected")]
+        [SuppressMessage("Microsoft.Performance", "CA1823:AvoidUnusedPrivateFields", Justification = "The reference must be saved in order to prevent the timer from being garbage collected")]
         private static readonly Timer updateTimer;
 
         /// <summary>
@@ -62,15 +62,15 @@ namespace freakcode.frequency
         static Monotonic()
         {
             Monotonic.InitialTickCount = GetUnsignedEnvironmentTickCount();
-            
+
             // Using a timer to ensure that we don't miss an entire cycle
             // of environment.TickCount (~49 days) and thus return the 
             // same value twice.
-            
+
             // Run the timer once every 24 hours
             TimeSpan timerPeriod = TimeSpan.FromHours(24);
             updateTimer = new Timer(state => Time(), null, timerPeriod, timerPeriod);
-            
+
             CurrentTimeStamp = PackTimeStamp(0, 0);
         }
 
@@ -103,7 +103,7 @@ namespace freakcode.frequency
             if (newTick < oldTick)
             {
                 gen++;
-                
+
                 long newTimeStamp = PackTimeStamp(gen, newTick);
                 long originalStamp;
 
@@ -112,7 +112,7 @@ namespace freakcode.frequency
                 if (originalStamp != ts)
                 {
                     // We did not succeeded in replacing the timestamp.
-                    
+
                     // Continue trying to update the timeInfo until we succeed
                     // or the generation value is upgraded by someone else
                     while (UnpackGeneration(originalStamp) < gen)
@@ -129,7 +129,7 @@ namespace freakcode.frequency
                 {
                     long newTimeStamp = PackTimeStamp(gen, newTick);
                     long originalStamp;
-                    
+
                     bool exchangeSucceeded;
 
                     do
