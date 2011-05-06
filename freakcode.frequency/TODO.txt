@@ -1,0 +1,4 @@
+* When a counter has been non-empty and all nodes have expired
+  the head variable will still point to an expired node; this isn't
+  such a big deal since it will be purged on the next Add() and every
+  attempt I've made so far has made the code unjustifiably complex.

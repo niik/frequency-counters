@@ -60,6 +60,20 @@ namespace freakcode.frequency
         public int Precision { get; private set; }
 
         /// <summary>
+        /// The source of monotonic time, always DefaultMonotonicTimeProvider
+        /// except when running from unit tests.
+        /// </summary>
+        private IMonotonicTimeProvider timeProvider;
+        
+        private int nodeCount;
+
+        /// <summary>
+        /// Gets the number of non-expired node after last pruning.
+        /// Only used for unit testing
+        /// </summary>
+        internal int NodeCount { get { return this.nodeCount; } }
+
+        /// <summary>
         /// Actual storage location of current counter value. 
         /// </summary>
         private long value;
@@ -102,6 +116,16 @@ namespace freakcode.frequency
         /// <param name="duration">The time period (in seconds) for which the counter will be collecting samples.</param>
         /// <param name="precision">The precision/resolution of the counter in seconds.</param>
         public FrequencyCounter(int duration, int precision)
+            : this(duration, precision, DefaultMonotonicTimeProvider.Instance)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FrequencyCounter"/> class.
+        /// </summary>
+        /// <param name="duration">The time period (in seconds) for which the counter will be collecting samples.</param>
+        /// <param name="precision">The precision/resolution of the counter in seconds.</param>
+        internal FrequencyCounter(int duration, int precision, IMonotonicTimeProvider timeProvider)
         {
             if (duration < 1)
                 throw new ArgumentOutOfRangeException("duration");
@@ -111,6 +135,7 @@ namespace freakcode.frequency
 
             this.Duration = duration;
             this.Precision = precision;
+            this.timeProvider = timeProvider;
         }
 
         /// <summary>
@@ -154,11 +179,15 @@ namespace freakcode.frequency
                     // managed to update the node before us and we can use that instead.
                     if (Interlocked.CompareExchange(ref this.head, newNode, currentHead) == currentHead)
                     {
-                        // Succeeded in setting the head reference. If we wheren't empty
-                        // before we need to update the previous head node so that it references
-                        // the new head.
+                        // Succeeded in setting the head reference. 
+                        Interlocked.Increment(ref this.nodeCount);
+                        
+                        // If we weren't empty before we need to update the previous 
+                        // head node so that it references the new head.
                         if (currentHead != null)
                             currentHead.Next = newNode;
+
+                        currentHead = newNode;
 
                         // If the tail node reference is null we'll update it to point to
                         // our new head node.
@@ -182,6 +211,7 @@ namespace freakcode.frequency
         {
             int expiry = timeValue - Duration;
             long sampleCount = 0;
+            int nodeCount = 0;
 
             FrequencyNode currentTail, node;
 
@@ -189,7 +219,7 @@ namespace freakcode.frequency
             {
                 currentTail = this.tail;
 
-                if (currentTail.TimeValue >= expiry)
+                if (currentTail == null || currentTail.TimeValue >= expiry)
                     return;
 
                 node = currentTail;
@@ -199,6 +229,7 @@ namespace freakcode.frequency
                 while (node != null && node.TimeValue < expiry)
                 {
                     sampleCount += node.Samples;
+                    nodeCount++;
                     node = node.Next;
                 }
 
@@ -208,8 +239,11 @@ namespace freakcode.frequency
                 // collected eventually
                 if (Interlocked.CompareExchange(ref this.tail, node, currentTail) == currentTail)
                 {
+                    currentTail = node;
+
                     // We won the update race; subtract the sum of all detached nodes
                     Interlocked.Add(ref this.value, -sampleCount);
+                    Interlocked.Add(ref this.nodeCount, -nodeCount);
                 }
 
             } while (currentTail != null && currentTail.TimeValue > expiry);
@@ -222,7 +256,7 @@ namespace freakcode.frequency
         /// </summary>
         private int GetTimeValue()
         {
-            long monoTimeMilliseconds = Monotonic.Now;
+            long monoTimeMilliseconds = timeProvider.Now;
             int monoTimeSeconds = (int)(monoTimeMilliseconds / 1000);
 
             return monoTimeSeconds - (monoTimeSeconds % Precision);

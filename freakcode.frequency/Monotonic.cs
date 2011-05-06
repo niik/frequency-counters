@@ -26,7 +26,7 @@ using System.Threading;
 namespace freakcode.frequency
 {
     /// <summary>
-    /// Provides a consistently increasing values for time and numbers.
+    /// Provides a consistently increasing values for time.
     /// </summary>
     /// <remarks>All methods of this class is guaranteed to be thread safe</remarks>
     internal static class Monotonic
