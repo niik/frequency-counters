@@ -59,7 +59,6 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DefaultMonotonicTimeProvider.cs" />
     <Compile Include="FrequencyCounter.cs" />
     <Compile Include="IMonotonicTimeProvider.cs" />
     <Compile Include="Monotonic.cs" />

@@ -2,6 +2,7 @@
 
 namespace freakcode.frequency
 {
+#if DEBUG
     /// <summary>
     /// An interface for a provider of consistently increasing values for time.
     /// </summary>
@@ -15,4 +16,5 @@ namespace freakcode.frequency
         /// <remarks>This method should be implemented in a thread safe manner</remarks>
         long Now { get; }
     }
+#endif
 }
