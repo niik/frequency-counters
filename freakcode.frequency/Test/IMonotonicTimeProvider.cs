@@ -5,6 +5,7 @@ namespace freakcode.frequency
 #if DEBUG
     /// <summary>
     /// An interface for a provider of consistently increasing values for time.
+    /// Used for unit testing the counters.
     /// </summary>
     /// <remarks>All methods of implementing classes is guaranteed to be thread safe</remarks>
     interface IMonotonicTimeProvider

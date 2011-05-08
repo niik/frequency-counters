@@ -60,9 +60,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FrequencyCounter.cs" />
-    <Compile Include="IMonotonicTimeProvider.cs" />
     <Compile Include="Monotonic.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Test\IMonotonicTimeProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
