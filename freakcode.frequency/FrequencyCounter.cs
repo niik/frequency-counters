@@ -21,6 +21,8 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Runtime.CompilerServices;
+using System.Runtime.ConstrainedExecution;
 
 namespace freakcode.frequency
 {
@@ -64,7 +66,7 @@ namespace freakcode.frequency
         /// except when running from unit tests.
         /// </summary>
         private IMonotonicTimeProvider timeProvider;
-        
+
         private int nodeCount;
 
         /// <summary>
@@ -144,60 +146,63 @@ namespace freakcode.frequency
         /// <returns>The total sum of all samples in the counter after the sample has been added</returns>
         public long Increment()
         {
-            return this.Add(1);
+            return this.IncrementBy(1);
         }
 
         /// <summary>
         /// Add the specified sample count.
         /// </summary>
-        /// <param name="sampleCount">The number of samples to record. Must not be negative. If sampleCount is zero no action will be performed.</param>
+        /// <param name="value">
+        /// The number of samples to record. Must not be negative. If zero, no action will be performed. Negative values
+        /// are not allowed.
+        /// </param>
         /// <returns>The total sum of all samples in the counter after the samples has been added</returns>
-        public long Add(int sampleCount)
+        /// <exception cref="ArgumentOutOfRangeException">The value was negative</exception>
+        public long IncrementBy(int value)
         {
-            if (sampleCount == 0)
+            if (value == 0)
                 return Value;
 
-            if (sampleCount < 1)
-                throw new ArgumentOutOfRangeException("count");
+            if (value < 1)
+                throw new ArgumentOutOfRangeException("value");
 
             int timeValue = GetTimeValue();
 
-            FrequencyNode currentHead;
+            FrequencyNode currentHead = this.head;
 
-            do
+            while (currentHead == null || currentHead.TimeValue != timeValue)
             {
-                currentHead = this.head;
+                // The head node is out of date or we're empty so we need to
+                // create a new node to take it's place
+                var newHeadNode = new FrequencyNode { TimeValue = timeValue };
 
-                if (currentHead == null || currentHead.TimeValue != timeValue)
+                // Try to update the head reference to our newly created node.
+                // If we fail we'll just try again since most likely someone else
+                // managed to update the node before us and we can use that instead.
+                if (Interlocked.CompareExchange(ref this.head, newHeadNode, currentHead) == currentHead)
                 {
-                    // The head node is out of date or we're empty so we need to
-                    // create a new node to take it's place
-                    var newNode = new FrequencyNode { TimeValue = timeValue };
+                    // Succeeded in setting the head reference. 
+                    Interlocked.Increment(ref this.nodeCount);
 
-                    // Try to update the head reference to our newly created node.
-                    // If we fail we'll just try again since most likely someone else
-                    // managed to update the node before us and we can use that instead.
-                    if (Interlocked.CompareExchange(ref this.head, newNode, currentHead) == currentHead)
-                    {
-                        // Succeeded in setting the head reference. 
-                        Interlocked.Increment(ref this.nodeCount);
-                        
-                        // If we weren't empty before we need to update the previous 
-                        // head node so that it references the new head.
-                        if (currentHead != null)
-                            currentHead.Next = newNode;
+                    // If we weren't empty before we need to update the previous 
+                    // head node so that it references the new head.
+                    if (currentHead != null)
+                        currentHead.Next = newHeadNode;
 
-                        currentHead = newNode;
+                    currentHead = newHeadNode;
 
-                        // If the tail node reference is null we'll update it to point to
-                        // our new head node.
-                        Interlocked.CompareExchange(ref this.tail, newNode, null);
-                    }
+                    // If the tail node reference is null we'll update it to point to
+                    // our new head node.
+                    Interlocked.CompareExchange(ref this.tail, newHeadNode, null);
                 }
-            } while (currentHead == null || currentHead.TimeValue != timeValue);
+                else
+                {
+                    currentHead = this.head;
+                }
+            }
 
-            Interlocked.Add(ref currentHead.Samples, sampleCount);
-            Interlocked.Add(ref this.value, sampleCount);
+            Interlocked.Add(ref currentHead.Samples, value);
+            Interlocked.Add(ref this.value, value);
 
             Prune(timeValue);
 
@@ -210,8 +215,8 @@ namespace freakcode.frequency
         private void Prune(int timeValue)
         {
             int expiry = timeValue - Duration;
-            long sampleCount = 0;
-            int nodeCount = 0;
+            long removableSampleCount = 0;
+            int removableNodeCount = 0;
 
             FrequencyNode currentTail, node;
 
@@ -228,8 +233,8 @@ namespace freakcode.frequency
                 // all samples seen.
                 while (node != null && node.TimeValue < expiry)
                 {
-                    sampleCount += node.Samples;
-                    nodeCount++;
+                    removableSampleCount += node.Samples;
+                    removableNodeCount++;
                     node = node.Next;
                 }
 
@@ -242,8 +247,8 @@ namespace freakcode.frequency
                     currentTail = node;
 
                     // We won the update race; subtract the sum of all detached nodes
-                    Interlocked.Add(ref this.value, -sampleCount);
-                    Interlocked.Add(ref this.nodeCount, -nodeCount);
+                    Interlocked.Add(ref this.value, -removableSampleCount);
+                    Interlocked.Add(ref this.nodeCount, -removableNodeCount);
                 }
 
             } while (currentTail != null && currentTail.TimeValue > expiry);
