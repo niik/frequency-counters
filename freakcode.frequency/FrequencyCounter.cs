@@ -71,9 +71,9 @@ namespace freakcode.frequency
         /// duration of the counter.
         /// </summary>
         /// <value>The total number of samples.</value>
-        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
         public long Value
         {
+            [ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
             get
             {
                 // Fast-path out; if we're at zero there's no
