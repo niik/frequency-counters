@@ -90,7 +90,6 @@ namespace freakcode.frequency
         /// Gets the number of elapsed milliseconds since first initialized.
         /// Guaranteed to be a non-negative increasing number.
         /// </summary>
-        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
         public static long Time()
         {
             long ts = Interlocked.Read(ref Monotonic.CurrentTimeStamp);
