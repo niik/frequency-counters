@@ -8,22 +8,41 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{261A0D81-3DCD-4CBD-84F8-0957F7B5B8FA}"
 	ProjectSection(SolutionItems) = preProject
 		freakcode.frequency.testsettings = freakcode.frequency.testsettings
+		freakcode.frequency.vsmdi = freakcode.frequency.vsmdi
 	EndProjectSection
 EndProject
 Global
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = freakcode.frequency.vsmdi
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|Mixed Platforms = Release|Mixed Platforms
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Debug|x86.ActiveCfg = Debug|Any CPU
 		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{18BBDADA-31ED-42B4-9A20-59A11D97008C}.Release|x86.ActiveCfg = Release|Any CPU
 		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Debug|x86.ActiveCfg = Debug|Any CPU
 		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{5E312DF5-0C52-483C-B38B-C4FDBAD4C58E}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
